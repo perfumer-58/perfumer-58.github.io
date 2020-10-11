@@ -391,30 +391,30 @@ operators &lt;- read_csv(&quot;Data/operators_recruitment.csv&quot;) %&gt;%
   rename(operator = Operator,
          rarity = Rarity)</code></pre>
 <p>Calculate the minimum rarity guaranteed by tags kept in each recruitment, and the rarity of the operator recruited.</p>
-<pre class="r"><code>calc_guarantee &lt;- function(..., df = operators){
+<pre class="r"><code>calc_guarantee &lt;- function(..., df = operators) {
   possible &lt;- filter(df, ...)
 
   min_rarity &lt;- summarise(possible, min_rarity = min(rarity)) %&gt;%
     chuck(&quot;min_rarity&quot;)
-  
+
   min_rarity
 }
 
 data &lt;- data %&gt;%
-  mutate(kept_tag_1 = case_when(selected_1 == NA ~ NA_character_,
-                                selected_1 != coalesce(drop_1,&quot;&quot;) &amp;
-                                  selected_1 != coalesce(drop_2,&quot;&quot;) &amp;
-                                  selected_1 != coalesce(drop_3,&quot;&quot;) ~ paste0(&quot;`&quot;, selected_1, &quot;`&quot;),
+  mutate(kept_tag_1 = case_when(is.na(selected_1) ~ NA_character_,
+                                selected_1 != coalesce(drop_1, &quot;&quot;) &amp;
+                                  selected_1 != coalesce(drop_2, &quot;&quot;) &amp;
+                                  selected_1 != coalesce(drop_3, &quot;&quot;) ~ paste0(&quot;`&quot;, selected_1, &quot;`&quot;),
                                 TRUE ~ NA_character_),
-         kept_tag_2 = case_when(selected_2 == NA ~ NA_character_,
-                                selected_2 != coalesce(drop_1,&quot;&quot;) &amp;
-                                  selected_2 != coalesce(drop_2,&quot;&quot;) &amp;
-                                  selected_2 != coalesce(drop_3,&quot;&quot;) ~ paste0(&quot;`&quot;, selected_2, &quot;`&quot;),
+         kept_tag_2 = case_when(is.na(selected_2) ~ NA_character_,
+                                selected_2 != coalesce(drop_1, &quot;&quot;) &amp;
+                                  selected_2 != coalesce(drop_2, &quot;&quot;) &amp;
+                                  selected_2 != coalesce(drop_3, &quot;&quot;) ~ paste0(&quot;`&quot;, selected_2, &quot;`&quot;),
                                 TRUE ~ NA_character_),
-         kept_tag_3 = case_when(selected_3 == NA ~ NA_character_,
-                                selected_3 != coalesce(drop_1,&quot;&quot;) &amp;
-                                  selected_3 != coalesce(drop_2,&quot;&quot;) &amp;
-                                  selected_3 != coalesce(drop_3,&quot;&quot;) ~ paste0(&quot;`&quot;, selected_3, &quot;`&quot;),
+         kept_tag_3 = case_when(is.na(selected_3) ~ NA_character_,
+                                selected_3 != coalesce(drop_1, &quot;&quot;) &amp;
+                                  selected_3 != coalesce(drop_2, &quot;&quot;) &amp;
+                                  selected_3 != coalesce(drop_3, &quot;&quot;) ~ paste0(&quot;`&quot;, selected_3, &quot;`&quot;),
                                 TRUE ~ NA_character_)) %&gt;%
   unite(&quot;kept_tags&quot;, kept_tag_1, kept_tag_2, kept_tag_3, sep = &quot;, &quot;, na.rm = T) %&gt;%
   mutate(guarantee = map_dbl(kept_tags, function(x) eval(parse(text = paste0(&quot;calc_guarantee(&quot;, x, &quot;)&quot;)))),
@@ -454,13 +454,13 @@ res</code></pre>
 trials &lt;- res %&gt;%
   pluck(&quot;n&quot;)
 
-four_star &lt;- 
+four_star &lt;-
   matrix(c(success, trials - success),
          nrow = 2,
          dimnames = list(Timer = c(&quot;7h40m&quot;, &quot;9h&quot;),
                          Outcome = c(&quot;Success&quot;, &quot;Failure&quot;)))
 
-four_star &lt;- four_star[c(&quot;9h&quot;, &quot;7h40m&quot;),]
+four_star &lt;- four_star[c(&quot;9h&quot;, &quot;7h40m&quot;), ]
 
 fisher.test(four_star)</code></pre>
 <pre><code>## 
@@ -511,13 +511,13 @@ res</code></pre>
 trials &lt;- res %&gt;%
   pluck(&quot;n&quot;)
 
-five_star &lt;- 
+five_star &lt;-
   matrix(c(success, trials - success),
          nrow = 2,
          dimnames = list(Timer = c(&quot;7h40m&quot;, &quot;9h&quot;),
                          Outcome = c(&quot;Success&quot;, &quot;Failure&quot;)))
 
-five_star &lt;- five_star[c(&quot;9h&quot;, &quot;7h40m&quot;),]
+five_star &lt;- five_star[c(&quot;9h&quot;, &quot;7h40m&quot;), ]
 
 fisher.test(five_star)</code></pre>
 <pre><code>## 
