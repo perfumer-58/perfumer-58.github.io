@@ -385,13 +385,17 @@ summary {
 <ul>
 <li>Post: <a href="https://www.reddit.com/r/arknights/comments/hwo3tk/estimated_chance_of_recruitment_tags/" class="uri">https://www.reddit.com/r/arknights/comments/hwo3tk/estimated_chance_of_recruitment_tags/</a></li>
 </ul>
+<p>I exclude 2* or lower rarity operators from the operators dataframe bacause it’s not possible to pull them when the timer is set to 7h40m or greater. If I didn’t do this, the next chunk wouldn’t be able to calculate the guaranteed rarity correctly.</p>
 <pre class="r"><code>data &lt;- read_csv(&quot;Data/recruitment_tracker_fiveplop.csv&quot;, col_types = &quot;cccccccccccccc&quot;) %&gt;%
-  filter(complete.cases(tag_1, tag_2, tag_3, tag_4, tag_5))
+  filter(complete.cases(tag_1, tag_2, tag_3, tag_4, tag_5)) %&gt;%
+  filter(timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;),
+         as.numeric(id) &lt; 10000) #Observations &gt; 9999 are extra observations that u/FivePlop sent to me.
 
 operators &lt;- read_csv(&quot;Data/operators_recruitment.csv&quot;) %&gt;%
   mutate_at(vars(-Operator, -Rarity), as.logical) %&gt;%
   rename(operator = Operator,
-         rarity = Rarity)</code></pre>
+         rarity = Rarity) %&gt;%
+  filter(rarity &gt;= 3)</code></pre>
 <p>Calculate the minimum rarity guaranteed by tags kept in each recruitment, and the rarity of the operator recruited.</p>
 <pre class="r"><code>calc_guarantee &lt;- function(..., df = operators) {
   possible &lt;- filter(df, ...)
@@ -419,10 +423,9 @@ data &lt;- data %&gt;%
                                   selected_3 != coalesce(drop_3, &quot;&quot;) ~ paste0(&quot;`&quot;, selected_3, &quot;`&quot;),
                                 TRUE ~ NA_character_)) %&gt;%
   unite(&quot;kept_tags&quot;, kept_tag_1, kept_tag_2, kept_tag_3, sep = &quot;, &quot;, na.rm = T) %&gt;%
-  mutate(guarantee = map_dbl(kept_tags, function(x) eval(parse(text = paste0(&quot;calc_guarantee(&quot;, x, &quot;)&quot;)))),
-         guarantee = case_when(timer %in% c(&quot;7h30m&quot;) &amp; guarantee &lt; 2 ~ 2,
-                               timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;) &amp; guarantee &lt; 3 ~ 3,
-                               is.na(timer) ~ NA_real_,
+  mutate(guarantee = map_dbl(kept_tags, function(x) eval(parse(text = paste0(&quot;calc_guarantee(&quot;, x, &quot;)&quot;))))) %&gt;%
+  rowwise() %&gt;%
+  mutate(guarantee = case_when(is.na(timer) ~ NA_real_,
                                TRUE ~ guarantee))
 
 op_rarity &lt;- operators %&gt;%
@@ -437,7 +440,9 @@ rm(op_rarity)</code></pre>
 <p>Share of 4* by timer</p>
 <pre class="r"><code>res &lt;- data %&gt;%
   filter(guarantee == 3,
-         timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;)) %&gt;%
+         timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;),
+         !is.na(operator)) %&gt;%
+  filter(!is.na(rarity)) %&gt;%
   group_by(timer) %&gt;%
   summarise(four_star_or_greater = sum(rarity &gt;= 4),
             share_4_star_or_greater = sum(rarity &gt;= 4) / n(),
@@ -448,7 +453,7 @@ res</code></pre>
 ##   timer four_star_or_greater share_4_star_or_greater     n
 ##   &lt;chr&gt;                &lt;int&gt;                   &lt;dbl&gt; &lt;int&gt;
 ## 1 7h40m                   66                  0.0835   790
-## 2 9h                      58                  0.119    486</code></pre>
+## 2 9h                      28                  0.0614   456</code></pre>
 <p>Fisher’s exact test</p>
 <pre class="r"><code>success &lt;- res %&gt;%
   pluck(&quot;four_star_or_greater&quot;)
@@ -469,17 +474,18 @@ fisher.test(four_star)</code></pre>
 ##  Fisher&#39;s Exact Test for Count Data
 ## 
 ## data:  four_star
-## p-value = 0.04086
+## p-value = 0.1814
 ## alternative hypothesis: true odds ratio is not equal to 1
 ## 95 percent confidence interval:
-##  1.004667 2.193682
+##  0.4368211 1.1534421
 ## sample estimates:
 ## odds ratio 
-##   1.486015</code></pre>
+##  0.7178273</code></pre>
 <p>Share of 5* by timer (guaranteed 3* only)</p>
 <pre class="r"><code>res &lt;- data %&gt;%
   filter(guarantee == 3,
-         timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;)) %&gt;%
+         timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;),
+         !is.na(operator)) %&gt;%
   group_by(timer) %&gt;%
   summarise(five_star = sum(rarity == 5),
             share_5_star = sum(rarity == 5) / n(),
@@ -490,11 +496,12 @@ res</code></pre>
 ##   timer five_star share_5_star     n
 ##   &lt;chr&gt;     &lt;int&gt;        &lt;dbl&gt; &lt;int&gt;
 ## 1 7h40m         1      0.00127   790
-## 2 9h            2      0.00412   486</code></pre>
+## 2 9h            2      0.00439   456</code></pre>
 <p>Share of 5* by timer (guaranteed 3* or 4* only)</p>
 <pre class="r"><code>res &lt;- data %&gt;%
   filter(guarantee == 3 | guarantee == 4,
-         timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;)) %&gt;%
+         timer %in% c(&quot;7h40m&quot;, &quot;9h&quot;),
+         !is.na(operator)) %&gt;%
   group_by(timer) %&gt;%
   summarise(five_star = sum(rarity == 5),
             share_4_star_or_greater = sum(rarity == 5) / n(),
@@ -533,47 +540,23 @@ fisher.test(five_star)</code></pre>
 ## sample estimates:
 ## odds ratio 
 ##   3.072068</code></pre>
-<p>Replicating some of the results from u/FivePlop’s post.</p>
-<pre class="r"><code>tags &lt;- data %&gt;%
-  select(tag_1:tag_5)
-
-freq &lt;- tags %&gt;%
-  pivot_longer(cols = tag_1:tag_5,
-               values_to = &quot;tag&quot;) %&gt;%
-  group_by(tag) %&gt;%
-  summarise(n = n()) %&gt;%
-  mutate(share = n / sum(n) * 5) %&gt;%
-  arrange(-share)
-
-freq</code></pre>
-<pre><code>## # A tibble: 28 x 3
-##    tag             n share
-##    &lt;chr&gt;       &lt;int&gt; &lt;dbl&gt;
-##  1 Caster       1038 0.425
-##  2 Medic         985 0.403
-##  3 DP-Recovery   963 0.394
-##  4 Starter       946 0.387
-##  5 Vanguard      945 0.387
-##  6 Ranged        873 0.357
-##  7 Supporter     817 0.335
-##  8 Guard         769 0.315
-##  9 Sniper        648 0.265
-## 10 Melee         628 0.257
-## # ... with 18 more rows</code></pre>
-<pre class="r"><code>data %&gt;%
-  filter(!is.na(rarity)) %&gt;%
-  group_by(rarity) %&gt;%
-  summarise(n = n()) %&gt;%
-  mutate(share = n / sum(n))</code></pre>
-<pre><code>## # A tibble: 6 x 3
-##   rarity     n   share
-##    &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;
-## 1      1     6 0.00377
-## 2      2     4 0.00251
-## 3      3  1154 0.725  
-## 4      4   409 0.257  
-## 5      5    14 0.00879
-## 6      6     5 0.00314</code></pre>
+<p>These are not valid since I’ve only included 7h40m and 9h recruitments in the data. <!-- Replicating some of the results from u/FivePlop's post. --> <!-- ```{r most common tags} --> <!-- tags <- data %>% --> <!--   select(tag_1:tag_5) --></p>
+<!-- freq <- tags %>% -->
+<!--   pivot_longer(cols = tag_1:tag_5, -->
+<!--                values_to = "tag") %>% -->
+<!--   group_by(tag) %>% -->
+<!--   summarise(n = n()) %>% -->
+<!--   mutate(share = n / sum(n) * 5) %>% -->
+<!--   arrange(-share) -->
+<!-- freq -->
+<!-- ``` -->
+<!-- ```{r outcomes} -->
+<!-- data %>% -->
+<!--   filter(!is.na(rarity)) %>% -->
+<!--   group_by(rarity) %>% -->
+<!--   summarise(n = n()) %>% -->
+<!--   mutate(share = n / sum(n)) -->
+<!-- ``` -->
 
 
 
